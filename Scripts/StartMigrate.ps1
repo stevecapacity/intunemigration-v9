@@ -221,3 +221,208 @@ else {
     $upn = $null
     $entraUserId = $null
 }
+
+$currentUser = @{
+    userName    = $userName
+    upn         = $upn
+    entraUserId = $entraUserId
+    profilePath = $profilePath
+    SAMName     = $SAMName
+    SID         = $SID
+}
+
+# Write user object to registry
+foreach ($x in $currentUser.Keys) {
+    $currentUserName = "OLD_$($x)"
+    $currentUserValue = $($currentUser[$x])
+    # Check if value is null or empty
+    if ([string]::IsNullOrEmpty($currentUserValue)) {
+        log warning "$($currentUserName) is empty"
+        log warning "Skipping registry write for $($currentUserName)"
+    }
+    else {
+        log "Writing $($currentUserName) with value $($currentUserValue) to registry..."
+        try {
+            reg.exe add $($config.regPath) /v $currentUserName /t REG_SZ /d $currentUserValue /f | Out-Null
+            log success "Successfully wrote $($currentUserName) with value $($currentUserValue) to registry."
+        }
+        catch {
+            $message = $_.Exception.Message
+            log error "Failed to write $($currentUserName) to registry: $message"
+        }
+    }
+}
+
+# Try to get new user info from target tenant
+$newHeaders = ""
+if ($targetHeaders) {
+    $tenant = $config.targetTenant.tenantName
+    log info "Target tenant headers found. Getting new user object from $tenant tenant..."
+    $newHeaders = $targetHeaders
+}
+else {
+    $tenant = $config.sourceTenant.tenantName
+    log info "Target tenant headers not found. Getting new user object from $tenant tenant..."
+    $newHeaders = $sourceHeaders
+}
+
+# Use the username part of UPN for lookup (standard approach)
+$fullUPN = $($currentUser.upn)
+if ($null -eq $fullUPN -or $fullUPN -eq "") {
+    log error "Current user UPN is null or empty. Cannot perform user lookup."
+    exit 1
+}
+$userLookup = $fullUPN.Split("@")[0]
+log info "Looking up user where UPN starts with: $userLookup..."
+
+# Get new user object from graph
+$userURI = "https://graph.microsoft.com/beta/users?`$filter=startsWith(userPrincipalName, '$userLookup')"
+$response = Invoke-MgGraphRequest -Method GET -Uri $userURI
+$newUserObject = $response.value
+
+# if new user graph request is successful, set new user object
+if ($null -ne $newUserObject) {
+    log info "New user found in $tenant tenant"
+    $newUser = @{
+        upn         = $newUserObject.userPrincipalName
+        entraUserID = $newUserObject.id
+        SAMName     = $newUserObject.userPrincipalName.Split("@")[0]
+        SID         = $newUserObject.securityIdentifier
+    }
+    # Write new user values to registry
+    foreach ($x in $newUser.keys) {
+        $newUserName = "NEW_$($x)"
+        $newUserValue = $($newUser[$x])
+        if ([string]::IsNullOrEmpty($newUserValue)) {
+            log warning "$($newUserName) is null"
+            log warning "Skipping registry write for $($newUserName)"
+        }
+        else {
+            log info "Writing $($newUserName) to registry with value $($newUserValue)..."
+            try {
+                reg.exe add $($config.regPath) /v $newUserName /t REG_SZ /d $newUserValue /f | Out-Null
+                log success "Successfully wrote $($newUserName) to registry with value $($newUserValue)."
+            }
+            catch {
+                $message = $_.Exception.Message
+                log error "Failed to write $($newUserName) to registry: $message"
+            }
+        }
+    }
+}
+else {
+    log info "New user not found in $tenant tenant. Prompting for user sign in..."
+
+    # Check for NuGet package provider
+    $nuget = Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue
+    if (-not($nuget)) {
+        log info "Nuget package provider not found- installing..."
+        try {
+            Install-PackageProvider -Name NuGet -Confirm:$false -Force
+            log success "Nuget installed successfully."
+        }
+        catch {
+            $message = $_.Exception.Message
+            log error "Failed to install Nuget: $message"
+            log error "Exiting script"
+            exit 1
+        }
+    }
+    else {
+        log info "Nuget package provider found."
+    }
+
+    # Check for required modules
+    $modules = ("Az.Accounts", "RunAsUser")
+    foreach ($module in $modules) {
+        $installedModule = Get-InstalledModule -Name $module -ErrorAction SilentlyContinue
+        if (-not($installedModule)) {
+            log info "$module module not found - installing..."
+            if ($module -eq "Az.Accounts") {
+                log info "Module is $($module): setting required version to 4.2.0..."
+                $version = "4.2.0"
+                try {
+                    Install-Module -Name $module -RequiredVersion $version -Force
+                    log success "$module installed successfully"
+                }
+                catch {
+                    $message = $_.Exception.Message
+                    log error "Failed to install module $($module): $message"
+                    log error "Exiting"
+                    exit 1
+                }
+            }
+            else {
+                try {
+                    Install-Module -Name $module -Force
+                    log success "$module installed successfully"
+                }
+                catch {
+                    $message = $_.Exception.Message
+                    log error "Failed to install $($module): $message"
+                    log error "Exiting script"
+                    exit 1
+                }
+            }
+        }
+        elseif ($module -eq "Az.Accounts" -and $installedModule.Version -ge "5.0.0") {
+            log info "Uninstalling newer version of $module..."
+            $version = "4.2.0"
+            try {
+                Uninstall-Module -Name $module -AllVersions -Force
+                Install-Module -Name $module -RequiredVersion $version -Force
+                log success "Successfully replaced $module with version $version"
+            }
+            catch {
+                $message = $_.Exception.Message
+                log error "Failed to downgrade $($module) to version $($version): $message"
+                log error "Exiting script"
+                exit 1
+            }
+        }
+        else {
+            log info "$module already installed"
+        } 
+    }
+
+    $scriptBlock = {
+        Import-Module Az.Accounts
+
+        # Get token from OAuth
+        Clear-AzContext -Force
+        Update-AzConfig -EnableLoginByWam $false -LoginExperienceV2 Off
+        Connect-AzAccount
+        $theToken = Get-AzAccessToken -ResourceUrl "https://graph.microsoft.com/"
+
+        # Get token
+        $token = -join("Bearer ", $theToken.Token)
+
+        # Reinstantiate headers
+        $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+        $headers.add("Authorization", $token)
+        $headers.Add("Content-Type", "application/json")
+
+        # Get new user object
+        $newUserObject = Invoke-RestMethod -Method Get -Uri "https://graph.microsoft.com/beta/me" -Headers $headers
+
+        # assemble ne wuser object
+        $newUser = @{
+            upn = $newUserObject.userPrincipalName
+            entraUserId = $newUserOb.id
+            SAMName = $newUserObject.userPrincipalName.Split("@")[0]
+            SID = $newUserObject.securityIdentifier
+        } | ConvertTo-Json
+
+        $newUser | Out-File "C:\temp\newUserInfo.json"
+    }
+    $newUserPath= = "C:\temp\newUserInfo.json"
+    $timeout = 300
+    $checkInterval = 5
+    $elapsedTime = 0
+    Invoke-AsCurrentUser -ScriptBlock $scriptBlock -UseWindowsPowerShell
+    while($elapsedTime -lt $timeout){
+        if(Test-Past $newUserPath){
+            log "New user found. Continue"
+        }
+    }
+}
