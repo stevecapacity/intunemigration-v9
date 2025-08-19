@@ -81,7 +81,6 @@ function setRegistry() {
     Param(
         [string]$regPath,
         [string]$regName,
-        [string]$regType,
         [object]$regValue
     )
 
@@ -95,17 +94,13 @@ function setRegistry() {
     $currentValue = Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue
 
     if ($null -eq $currentValue) {
-        log warning "$regName not found, setting to 1..."
         New-ItemProperty -Path $regPath -Name $regName -Value $regValue -Force | Out-Null
-        log success "Successfully set $regName to 1"
     }
     elseif ($currentValue.$regName -ne $regValue) {
-        log warning "$regName is currently set to $($currentValue.$regName), changing to $regValue..."
         Set-ItemProperty -Path $regPath -Name $regName -Value $regValue -Force | Out-Null
-        log success "Successfully updated $regName to $regValue"
     }
     else {
-        log success "$regName is already set to $regValue"
+        return
     }
 }
 
