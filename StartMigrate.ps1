@@ -597,7 +597,7 @@ $adminPW = generatePassword
 $adminGroup = Get-CimInstance -Query "Select * From Win32_Group Where LocalAccount = True And SID = 'S-1-5-32-544'"
 $adminGroupName = $adminGroup.Name
 New-LocalUser -Name $migrateAdmin -Password $adminPW -PasswordNeverExpires
-Add-LocalGroupMember -Group $adminGroup -Member $migrateAdmin
+Add-LocalGroupMember -Group $adminGroupName -Member $migrateAdmin
 
 if ($pc.domainJoined -eq "YES") {
     $hostname = $pc.hostname
