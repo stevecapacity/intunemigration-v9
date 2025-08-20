@@ -1,15 +1,19 @@
-<# REBOOT.PS1
-Synopsis
-Reboot.ps1 automatically changes the userSid and user profile ownership to the new user and reboots the machine.
-DESCRIPTION
-This script is used to change ownership of the original user profile to the destination user and then reboot the machine.  It is executed by the 'reboot' scheduled task.
-USE
-.\reboot.ps1
-.OWNER
-Steve Weiner
-.CONTRIBUTORS
-Logan Lautt
 
+<#
+    .SYNOPSIS
+        Changes user SID and profile ownership to the new user, then reboots the machine.
+
+    .DESCRIPTION
+        This script changes ownership of the original user profile to the destination user and reboots the machine. It is executed by the 'reboot' scheduled task.
+
+    .EXAMPLE
+        .\reboot.ps1
+
+    .AUTHOR
+        Steve Weiner
+
+    .CONTRIBUTORS
+        Logan Lautt
 #>
 
 $ErrorActionPreference = "SilentlyContinue"
@@ -57,7 +61,7 @@ log "Reboot task disabled"
 
 # disable auto logon
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" -Name "AutoAdminLogon" -Value 0 -Verbose
-log "Auto logon enabled."
+log "Auto logon disabled."
 
 # set new wallpaper
 $wallpaper = (Get-ChildItem -Path $config.localPath -Filter "*.jpg" -Recurse).FullName

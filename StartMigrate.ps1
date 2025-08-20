@@ -64,7 +64,7 @@ foreach ($file in $files) {
     log info "Copying $($file.FullName) to $destination..."
     try {
         Copy-Item -Path $file.FullName -Destination $destination -Recurse -Force
-        log success "Coppied $($file.FullName) to $destination"
+        log success "Copied $($file.FullName) to $destination"
     }
     catch {
         $message = $_.Exception.Message
@@ -105,7 +105,7 @@ if ([string]::IsNullOrEmpty($config.targetTenant.tenantName)) {
 else {
     log info "Destination tenant found in configuration file"
     try {
-        log info "Authenticate to destination tenant $($config.targetTenant.tenantName)..."
+        log info "Authenticating to destination tenant $($config.targetTenant.tenantName)..."
         $targetHeaders = msGraphAuthenticate -tenantName $config.targetTenant.tenantName -clientId $config.targetTenant.clientId -clientSecret $config.targetTenant.clientSecret
         log success "Authenticated to destination tenant $($config.targetTenant.tenantName)"
     }
@@ -432,20 +432,20 @@ else {
         # assemble ne wuser object
         $newUser = @{
             upn         = $newUserObject.userPrincipalName
-            entraUserId = $newUserOb.id
+            entraUserId = $newUserObject.id
             SAMName     = $newUserObject.userPrincipalName.Split("@")[0]
             SID         = $newUserObject.securityIdentifier
         } | ConvertTo-Json
 
         $newUser | Out-File "C:\temp\newUserInfo.json"
     }
-    $newUserPath = = "C:\temp\newUserInfo.json"
+    $newUserPath = "C:\temp\newUserInfo.json"
     $timeout = 300
     $checkInterval = 5
     $elapsedTime = 0
     Invoke-AsCurrentUser -ScriptBlock $scriptBlock -UseWindowsPowerShell
     while ($elapsedTime -lt $timeout) {
-        if (Test-Past $newUserPath) {
+        if (Test-Path $newUserPath) {
             log info "New user found. Continue"
             $elapsedTime = $timeout
             break
@@ -787,7 +787,7 @@ if ($pc.autopilotId) {
     catch {
         $message = $_.Exception.Message
         log error "Failed to delete Autopilot object: $message"
-        log warning "Delete manually"
+    log warning "Please delete manually."
     }
 }
 else {

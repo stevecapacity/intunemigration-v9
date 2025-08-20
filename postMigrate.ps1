@@ -1,15 +1,19 @@
-<# POSTMIGRATE.PS1
-Synopsis
-PostMigrate.ps1 is run after the migration reboots have completed and the user signs into the PC.
-DESCRIPTION
-This script is used to update the device group tag in Entra ID and set the primary user in Intune and migrate the bitlocker recovery key.  The device is then registered with AutoPilot.
-USE
-.\postMigrate.ps1
-.OWNER
-Steve Weiner
-.CONTRIBUTORS
-Logan Lautt
 
+<#
+    .SYNOPSIS
+        Runs post-migration tasks after device reboot and user sign-in.
+
+    .DESCRIPTION
+        Updates device group tag in Entra ID, sets the primary user in Intune, migrates the BitLocker recovery key, and registers the device with AutoPilot.
+
+    .EXAMPLE
+        .\postMigrate.ps1
+
+    .AUTHOR
+        Steve Weiner
+
+    .CONTRIBUTORS
+        Logan Lautt
 #>
 
 $ErrorActionPreference = "SilentlyContinue"
@@ -139,24 +143,20 @@ catch
 }
 
 # updateGroupTag
-$tag1 = (Get-ItemProperty -Path "HKLM:\SOFTWARE\IntuneMigration" -Name "OLD_groupTag").OLD_groupTag
+
+$tag1 = (Get-ItemProperty -Path "HKLM:\SOFTWARE\IntuneMigration" -Name "OLD_groupTag" -ErrorAction SilentlyContinue).OLD_groupTag
 $tag2 = $config.groupTag
 
-if([string]::IsNullOrEmpty($tag1))
-{
-    $groupTag = $tag2
-}
-elseif([string]::IsNullOrEmpty($tag2)) {
+if (![string]::IsNullOrEmpty($tag1)) {
     $groupTag = $tag1
-}
-else
-{
+} elseif (![string]::IsNullOrEmpty($tag2)) {
+    $groupTag = $tag2
+} else {
     $groupTag = $null
-    log "Group tag not found"
+    log "No group tag found."
 }
 
-if(![string]::IsNullOrEmpty($groupTag))
-{
+if (![string]::IsNullOrEmpty($groupTag)) {
     log "Updating group tag to $($groupTag) for Entra Device $($entraId)..."
     $entraDeviceObject = Invoke-RestMethod -Method Get -Uri "https://graph.microsoft.com/beta/devices/$entraId" -Headers $headers
     $physicalIds = $entraDeviceObject.physicalIds
@@ -166,21 +166,13 @@ if(![string]::IsNullOrEmpty($groupTag))
     $body = @{
         physicalIds = $physicalIds
     } | ConvertTo-Json
-        
-    try
-    {
+    try {
         Invoke-RestMethod -Uri "https://graph.microsoft.com/beta/devices/$entraId" -Method Patch -Headers $headers -Body $body
         log "Group tag updated to $($groupTag)."
-    }
-    catch
-    {
+    } catch {
         $message = $_.Exception.Message
         log "Error updating group tag: $message"
     }
-}
-else
-{
-    log "No group tag found."
 }
 
 schtasks.exe /create /xml "$($config.localPath)\groupTag.xml" /tn GroupTag /f | Out-Host

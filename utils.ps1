@@ -48,7 +48,7 @@ function msGraphAuthenticate() {
         [string]$clientSecret
     )
     $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-    $headers.Add("Content-Type", "application/x-www-form-urlencdoded")
+    $headers.Add("Content-Type", "application/x-www-form-urlencoded")
     $body = "grant_type=client_credentials&scope=https://graph.microsoft.com/.default"
     $body += -join ("&client_id=", $clientId, "&client_secret=", $clientSecret)
     $response = Invoke-RestMethod "https://login.microsoftonline.com/$tenantName/oauth2/v2.0/token" -Method Post -Headers $headers -Body $body
