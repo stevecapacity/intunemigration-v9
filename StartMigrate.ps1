@@ -64,7 +64,7 @@ if ($currentSID -notin $systemSIDs) {
 
 # Copy package files to local path
 log info "Copying package files to local path"
-$sourcePath = "$PSScriptRoot\PackageFiles"
+$sourcePath = ".\*"
 $files = Get-ChildItem -Path $sourcePath -Recurse
 $destination = $localPath
 foreach ($file in $files) {
