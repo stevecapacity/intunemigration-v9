@@ -1,6 +1,6 @@
-# Intune Device Migration | V9
+# Intune Device Migration | V9.1
   
-## Added in 9
+## Added in 9.1
 - Fix for updating registry to allow installing provisioning packages
 - Added detailed logging to the provision package installation
 - Added validation once PPKG is installed
