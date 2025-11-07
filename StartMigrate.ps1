@@ -17,7 +17,7 @@ INTUNE DEVICE MIGRATION V9
         1.0
 
     .DATE
-        August 19, 2025
+        October 27, 2025
 #>
 
 # Intune Device Migration V9
@@ -558,6 +558,10 @@ if ($pc.domainJoined -eq "YES") {
 else {
     log "PC is not domain joined"
 }
+
+# Add Computer to default workgroup
+Add-Computer -WorkGroupName "WORKGROUP"
+log info "Added $hostname to default workgroup: 'WORKGROUP'."
 
 # FUNCTION: removeSCCM
 # DESCRIPTION: Removes the SCCM client from the device.
