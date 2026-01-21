@@ -62,6 +62,49 @@ if ($currentSID -notin $systemSIDs) {
     exit 1
 }
 
+#Check PeferredDomainList
+$prefDomain = Get-ItemPropertyValue -Path HKLM:\SOFTWARE\Policies\Microsoft\AzureADAccount -Name PreferredTenantDomainName
+If ($prefDomain -ne $null) {
+    log error "Preferred tenant domain set to $prefDomain"
+    log error "Set Intune Device Category to Premigrate, Intune resync, retry."
+    exit 1
+}
+log info "No preferred tenant domain set...continuing"
+
+#Check user profiles for mutliple entries
+#########################################
+$UsersPath = "C:\Users"
+$Profiles = Get-ChildItem $UsersPath -Directory |
+Where-Object {
+    $_.Name -notin @(
+        "Public",
+        "Default",
+        "Default User",
+        "All Users",
+        "Administrator"
+    )
+}
+
+$Seen = @{}
+
+foreach ($Prof in $Profiles) {
+
+    # Base name = everything before the first dot
+    $BaseName = ($Prof.Name -split '\.')[0].ToLower()
+
+    # If we've already seen this base name, exit
+    if ($Seen.ContainsKey($BaseName)) {
+        log error "Duplicate user profile detected: '$BaseName'"
+        log error "Existing profile: $($Seen[$BaseName])"
+        log error  "Duplicate profile: $($Prof.FullName)"
+        exit 1
+    }
+    # Record first occurrence
+    $Seen[$BaseName] = $Prof.FullName
+}
+
+log info "No duplicate user profiles found. Continuing script..."
+
 # Copy package files to local path
 log info "Copying package files to local path"
 $sourcePath = ".\*"

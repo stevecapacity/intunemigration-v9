@@ -366,7 +366,7 @@ namespace UserProfile {
     log info "Running updateSamNameLogonCache..."
     try {
         updateSamNameLogonCache
-        log success"updateSamNameLogonCache completed"
+        log success "updateSamNameLogonCache completed"
     }
     catch {
         $message = $_.Exception.Message
@@ -423,7 +423,7 @@ namespace UserProfile {
         log info "Running updateSamNameIdentityStore..."
         try {
             updateSamNameIdentityStore
-            log success"updateSamNameIdentityStore completed"
+            log success "updateSamNameIdentityStore completed"
         }
         catch {
             $message = $_.Exception.Message
